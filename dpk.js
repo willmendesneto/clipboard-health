@@ -1,18 +1,25 @@
 const crypto = require('crypto');
 
+const MAX_PARTITION_KEY_LENGTH = 256;
+const TRIVIAL_PARTITION_KEY = '0';
+const DEFAULT_HASH_ALGORITHM = 'sha3-512';
+
 /**
  * Generates a CryptoHash based on the algorithm to be hashed
  * @param {*} value string to be hashed
- * @returns hashed value using algorithm `sha3-512` in hex
+ * @param {string} algorithm hashing algorithm to use (default: 'sha3-512')
+ * @returns hashed value using the specified algorithm in hex
  */
-exports.generateCryptoHash = (value) => crypto.createHash('sha3-512').update(value).digest('hex');
+const generateCryptoHash = (value, algorithm = DEFAULT_HASH_ALGORITHM) =>
+  crypto.createHash(algorithm).update(value).digest('hex');
 
-exports.MAX_PARTITION_KEY_LENGTH = 256;
-
-exports.deterministicPartitionKey = (event) => {
-  const TRIVIAL_PARTITION_KEY = '0';
-
-  if (typeof event === 'undefined' || event === null) {
+/**
+ * Generates a deterministic partition key based on the given event
+ * @param {*} event event object to generate partition key from
+ * @returns partition key string
+ */
+const deterministicPartitionKey = (event) => {
+  if (!event) {
     return TRIVIAL_PARTITION_KEY;
   }
 
@@ -23,12 +30,16 @@ exports.deterministicPartitionKey = (event) => {
         ? JSON.stringify(event.partitionKey)
         : event.partitionKey;
   } else {
-    partitionKey = exports.generateCryptoHash(JSON.stringify(event));
+    partitionKey = generateCryptoHash(JSON.stringify(event));
   }
 
-  if (partitionKey.length > exports.MAX_PARTITION_KEY_LENGTH) {
-    partitionKey = exports.generateCryptoHash(partitionKey);
-  }
+  return partitionKey.length > MAX_PARTITION_KEY_LENGTH
+    ? generateCryptoHash(partitionKey)
+    : partitionKey;
+};
 
-  return partitionKey;
+module.exports = {
+  MAX_PARTITION_KEY_LENGTH,
+  deterministicPartitionKey,
+  generateCryptoHash,
 };
